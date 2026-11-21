@@ -2190,9 +2190,14 @@ if (!last || (last.side || '') !== 'out') return; // 最后一条不是自己发
 if ((last.special || '') !== '') return; // 已读回执/系统卡不是「向 TA 说了一句话」
 if (!((last.ts || 0) > 0) || last.ts >= CHAT_SESSION_START) return; // 本场刚发的＝那一发还在飞，不归这里管
 const age = Date.now() - last.ts;
-if (age > chatTypingHorizonMs()) return; // 超出产品自己定义的「TA 最长会打多久」＝那是历史，不是欠
+/* 断线补发：把「发完消息、TA 回复还没生成就被后台杀掉」那一发补上。
+   原件这里用 chatTypingHorizonMs()（约 45 秒）当窗口、且过 rn-prob 概率闸——
+   被杀后隔几分钟/几小时再打开就被当成「历史」跳过，或 20% 概率直接不补。
+   改为 24 小时内一定补：判据仍是「最后一条是我发的」，不新增任何存储键。 */
+const DEBT_WINDOW_MS = 24 * 60 * 60 * 1000;
+if (age > DEBT_WINDOW_MS) return; // 24 小时前的＝历史，不补
 const c = cfg();
-if (hit(c['rn-prob'])) return;
+/* 取消 rn-prob 概率闸：欠下的回复一定补（其余回复概率、内容、动画一概不动） */
 if (window.nightModeActive && window.nightModeActive()) return;
 if (rateLimitFull()) return;
 const rsMin = Math.max(1, Number(c['rs-min']) || 1);
